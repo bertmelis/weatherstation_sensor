@@ -13,10 +13,10 @@
 #define setPinLow(x) PORTB &= ~(1 << x)
 #define setPinHigh(x) PORTB |= (1 << x)
 
-volatile uint8_t sleepCount = 8;  // times the watchdog woke the chip
-                                  // initialize with 8 for direct measurement
-constexpr uint8_t sleepCycles = 8;  // 8 * 8s = 64s ~ every 1min
-
+constexpr uint8_t sleepCycles = 38;  // 38 *8s = 304s ~ every 5min
+volatile uint8_t sleepCount = 38;  // times the watchdog woke the chip
+                                   // initialize with 38 for measurement
+                                   // on startup
 
 BME280 bme280(PB4);
 RF24 radio(-1, PB3);  // -1: CE pin is tied to Vcc
@@ -47,6 +47,7 @@ void goToSleep() {
 }
 
 void restoreFromSleep() {
+  sleepCount = 0;
   setPinAsOutput(PB0);
   setPinAsOutput(PB1);
   setPinAsOutput(PB2);
@@ -92,16 +93,19 @@ void loop() {
     bme280.forceMeasurement();
     delay(10);
     int32_t temp = bme280.getTemperature();
+    uint32_t humid = bme280.getHumidity();
+    uint32_t press = bme280.getPressure();
     uint16_t vBattery = getVcc();
 
-    int8_t payload[6] = {0};
+    uint8_t payload[14] = {0};
     memcpy(&payload[0], &temp, sizeof(temp));
-    memcpy(&payload[4], &vBattery, sizeof(vBattery));
-    if (!radio.write(payload, 6)){
+    memcpy(&payload[4], &humid, sizeof(humid));
+    memcpy(&payload[8], &press, sizeof(press));
+    memcpy(&payload[12], &vBattery, sizeof(vBattery));
+    if (!radio.write(payload, 14)) {
       // failed
     }
 
-    sleepCount = 0;
     prepareSleep();
   }
   goToSleep();

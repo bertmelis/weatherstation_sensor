@@ -27,7 +27,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <stdint.h>  // intX_t
 
-#include <Arduino.h>  // for delay()
 #include <SPI.h>
 
 class BME280 {
@@ -59,8 +58,6 @@ class BME280 {
   uint16_t _digT1;
   int16_t _digT2;
   int16_t _digT3;
-  uint8_t _data[8];
-  int32_t _tFine;
   uint16_t _digP1;
   int16_t _digP2;
   int16_t _digP3;
@@ -76,6 +73,8 @@ class BME280 {
   int16_t _digH4;
   int16_t _digH5;
   int8_t _digH6;
+  uint8_t _data[8];
+  int32_t _tFine;
 
   // this method includes calculation for _tFine
   void _getData();

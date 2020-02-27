@@ -36,33 +36,47 @@ BME280::BME280(int8_t cePin) :
   _digT1(0),
   _digT2(0),
   _digT3(0),
+  _digP1(0),
+  _digP2(0),
+  _digP3(0),
+  _digP4(0),
+  _digP5(0),
+  _digP6(0),
+  _digP7(0),
+  _digP8(0),
+  _digP9(0),
+  _digH1(0),
+  _digH2(0),
+  _digH3(0),
+  _digH4(0),
+  _digH5(0),
+  _digH6(0),
   _data{0},
   _tFine(0) {}
 
 void BME280::setup() {
   setPinAsOutput(_csPin);
   setPinLow(_csPin);
-  uint8_t data = 0;
 
-  // on powerup, chip is in sleep mode, all settings to zero
-  // so no need to do this explicitely
-
-  // set humidity sensing, before writing to ctrl_meas
+  // soft reset the sensor
+  // this will also clear settings and put the sensor to sleep mode
   setPinLow(_csPin);
-  data = 0b00000001;
-  SPI.transfer(0xF2 & 0xF7);
+  SPI.transfer(0xE0 & 0x7F);
+  SPI.transfer(0xB6);
   setPinHigh(_csPin);
 
-  // set temp and press sensing, write to ctrl_meas
-  data |= 0b00100000;  // temp oversampling x1
-  data |= 0b00000100;  // press oversampling x1
-  data |= 0b00000001;  // force mode
-  setPinLow(_csPin);
-  SPI.transfer(0xF4 & 0x7F);
-  SPI.transfer(data);
-  setPinHigh(_csPin);
+  // wait for sensor to start (eg. copy NVM data to registers)
+  uint8_t status = 1;
+  do {
+    delay(2);
+    setPinLow(_csPin);
+    SPI.transfer(0xF3 | 0x80);
+    status = SPI.transfer(0x00);
+    setPinHigh(_csPin);
+  }
+  while ((status & (1 << 0)) != 0);
 
-  // get calibration data
+  // sensor is ready, get calibration data
   setPinLow(_csPin);
   SPI.transfer(0x88 | 0x80);  // 0x88 to 0xA1
   uint8_t calibData[25] = {0};
@@ -91,9 +105,24 @@ void BME280::setup() {
   setPinHigh(_csPin);
   _digH2 = (uint16_t)calibData[1] << 8 | (uint16_t)calibData[0];
   _digH3 = calibData[2];
-  _digH4 = (uint16_t)calibData[4] << 8 | (uint16_t)calibData[3];
-  _digH5 = (uint16_t)calibData[6] << 8 | (uint16_t)calibData[5];
+  _digH4 = ((int8_t)calibData[3] << 4) | (calibData[4] & 0xF);
+  _digH5 = ((int8_t)calibData[6] << 4) | (calibData[5] >> 4);
   _digH6 = calibData[7];
+
+  // set humidity sensing in ctrl_hum, before writing to ctrl_meas
+  setPinLow(_csPin);
+  SPI.transfer(0xF2 & 0x7F);
+  SPI.transfer(0b00000001);  // humid oversampling x1
+  setPinHigh(_csPin);
+
+  // set temp and press sensing, write to ctrl_meas
+  uint8_t data = 0b00100000;   // temp oversampling x1
+  data |= 0b00000100;          // press oversampling x1
+  data |= 0b00000001;          // force mode
+  setPinLow(_csPin);
+  SPI.transfer(0xF4 & 0x7F);
+  SPI.transfer(data);
+  setPinHigh(_csPin);
 }
 
 void BME280::forceMeasurement() {
@@ -115,7 +144,7 @@ int32_t BME280::getTemperature() {
   if (!_gotData) {
     _getData();
   }
-  // calculation done in _getData
+  // calculation done in _getData()
   int32_t temperature = (_tFine * 5 + 128) >> 8;
   return temperature;
 }
@@ -146,13 +175,13 @@ uint32_t BME280::getHumidity() {
   }
   int32_t hRaw = ((uint32_t)_data[6] << 8) | ((uint32_t)_data[7]);
   int32_t var1 = _tFine - ((int32_t)76800);
-  var1 = (((((hRaw << 14) - (((int32_t)_digH4) << 20) - (((int32_t)_digH5) *
-         var1)) + ((int32_t)16384)) >> 15) * (((((((var1 *
-         ((int32_t)_digH6)) >> 10) * (((var1 * (int32_t)_digH3)) >> 11) +
-         ((int32_t)32768)) >> 10) + ((int32_t)2097152)) * ((int32_t)_digH2) +
-         8192) >> 14));
-  var1 = (var1 - (((((var1 >> 15) * (var1 >> 15)) >> 7) *
-         ((int32_t)_digH1)) >> 4));
+  var1 = ((((hRaw << 14) - (((int32_t)_digH4) << 20) - (((int32_t)_digH5) *
+         var1)) + ((int32_t)16384)) >> 15) * (((((((var1 * 
+         ((int32_t)_digH6)) >> 10) * (((var1 * ((int32_t)_digH3)) >> 11) +
+         ((int32_t)32768))) >> 10) + ((int32_t)2097152)) * ((int32_t)_digH2) +
+         8192) >> 14);
+  var1 = var1 - (((((var1 >> 15) * (var1 >> 15)) >> 7) *
+         ((int32_t)_digH1)) >> 4);
   var1 = var1 < 0 ? 0 : var1;
   var1 = var1 > 419430400 ? 419430400 : var1;
   return (uint32_t)(var1 >> 12);
