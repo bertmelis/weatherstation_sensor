@@ -14,9 +14,9 @@
 #define setPinHigh(x) PORTB |= (1 << x)
 
 constexpr uint8_t sleepCycles = 38;  // 38 *8s = 304s ~ every 5min
-volatile uint8_t sleepCount = 38;  // times the watchdog woke the chip
-                                   // initialize with 38 for measurement
-                                   // on startup
+volatile uint8_t sleepCount = 38;    // times the watchdog woke the chip
+                                     // initialize with 38 for measurement
+                                     // on startup
 
 BME280 bme280(PB4);
 RF24 radio(-1, PB3);  // -1: CE pin is tied to Vcc
@@ -54,18 +54,18 @@ void restoreFromSleep() {
   setPinAsOutput(PB3);
   setPinAsOutput(PB4);
   SPI.begin();
-  radio.powerUp();  // do early to give time
+  radio.powerUp();  // do before reading sensors to give time to radio to start
 }
 
 uint16_t getVcc() {
-  ADCSRA |= 1<<ADEN;  // enable ADC
-  ADMUX = (0<<REFS0) | (12<<MUX0);
+  ADCSRA |= 1 << ADEN;  // enable ADC
+  ADMUX = (0 << REFS0) | (12 << MUX0);
   delay(2);
-  ADCSRA |= (1<<ADSC); // Convert
+  ADCSRA |= (1 << ADSC); // Convert
   while (bit_is_set(ADCSRA,ADSC));
   uint16_t vRaw = ADCW;
   uint16_t vBattery = 1081089L / vRaw;  // ref multimeter measurement
-  ADCSRA &= ~(1<<ADEN);  // disable ADC
+  ADCSRA &= ~(1 << ADEN);  // disable ADC
   return vBattery;  // returns Vcc in mV
 }
 
