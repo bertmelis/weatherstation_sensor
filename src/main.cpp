@@ -82,7 +82,7 @@ void setup() {
 
   setPinAsOutput(PB3);
   radio.begin();
-  radio.setPALevel(RF24_PA_LOW);
+  radio.setPALevel(RF24_PA_MAX);
   radio.openWritingPipe(address);
 }
 
